@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Next.js application
+  videocall-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_TURN_SERVER=turn:${SERVER_IP}:3478
+      - NEXT_PUBLIC_TURN_USERNAME=videocall
+      - NEXT_PUBLIC_TURN_PASSWORD=secretpassword123
+    depends_on:
+      - coturn
+    restart: unless-stopped
+    networks:
+      - videocall-network
+
+  # TURN server (coturn)
+  coturn:
+    build:
+      context: .
+      dockerfile: Dockerfile.coturn
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"  # TLS port
+      - "49152-65535:49152-65535/udp"  # Relay ports
+    environment:
+      - SERVER_IP=${SERVER_IP}
+    volumes:
+      - coturn-logs:/var/log/coturn
+    restart: unless-stopped
+    networks:
+      - videocall-network
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl:ro
+    depends_on:
+      - videocall-app
+    restart: unless-stopped
+    networks:
+      - videocall-network
+
+volumes:
+  coturn-logs:
+
+networks:
+  videocall-network:
+    driver: bridge

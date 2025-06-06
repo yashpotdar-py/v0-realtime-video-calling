@@ -1,0 +1,32 @@
+# Dockerfile for coturn TURN server
+FROM ubuntu:20.04
+
+# Avoid prompts from apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install coturn and dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    coturn \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create coturn user
+RUN useradd -r -s /bin/false coturn
+
+# Copy configuration
+COPY coturn.conf /etc/coturn/turnserver.conf
+
+# Create directories and set permissions
+RUN mkdir -p /var/log/coturn && \
+    chown -R coturn:coturn /var/log/coturn && \
+    chown -R coturn:coturn /etc/coturn
+
+# Expose TURN server ports
+EXPOSE 3478/udp 3478/tcp
+EXPOSE 49152-65535/udp
+
+# Run as coturn user
+USER coturn
+
+# Start coturn
+CMD ["turnserver", "-c", "/etc/coturn/turnserver.conf", "-v"]
